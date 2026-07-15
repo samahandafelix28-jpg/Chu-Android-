@@ -1,0 +1,959 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Music2, PenLine, Clapperboard, Palette, Lightbulb, Search, Users,
+  Award, Briefcase, MessageCircle, BookOpen, LayoutDashboard, Bell,
+  Mail, Bookmark, Plus, X, ChevronRight, Sparkles, Globe2, Heart,
+  MapPin, ArrowRight, Send, GraduationCap, Star, CheckCircle2,
+  ExternalLink, Menu, Rocket
+} from "lucide-react";
+
+/* ---------------------------------------------------------------
+   CHU — Creative Humanity Universe
+   Design tokens
+   ink #14102B  surface #1E1840  surface2 #241C4A
+   gold #F2B705 (Music)   ember #E8543E (Writing)
+   sky  #4EA8DE (Film)    violet #9B6BFF (Art & Design)
+   mint #4ECCA3 (Innovation)
+   mist #B8B3D9  paper #F5F3FF
+------------------------------------------------------------------*/
+
+const CATS = [
+  { id: "music", label: "Music", icon: Music2, color: "#F2B705" },
+  { id: "writing", label: "Writing & Poetry", icon: PenLine, color: "#E8543E" },
+  { id: "film", label: "Film & Storytelling", icon: Clapperboard, color: "#4EA8DE" },
+  { id: "art", label: "Art & Design", icon: Palette, color: "#9B6BFF" },
+  { id: "innovation", label: "Innovation", icon: Lightbulb, color: "#4ECCA3" },
+];
+
+const catById = (id) => CATS.find((c) => c.id === id) || CATS[0];
+
+const SEED_CREATORS = [
+  { id: "c1", name: "Mwansa Chileshe", location: "Lusaka, Zambia", cat: "music", bio: "Afro-fusion vocalist blending Bemba folk melodies with modern production.", achievements: "Featured on 3 regional playlists", portfolio: "soundcloud.com/mwansa" },
+  { id: "c2", name: "Amara Osei", location: "Accra, Ghana", cat: "writing", bio: "Poet exploring migration, memory, and home across the diaspora.", achievements: "Published chapbook, 2025", portfolio: "amaraosei.com" },
+  { id: "c3", name: "Diego Fuentes", location: "Bogotá, Colombia", cat: "film", bio: "Documentary filmmaker telling stories from Andean farming communities.", achievements: "Selected — Bogotá Shorts 2025", portfolio: "vimeo.com/diegof" },
+  { id: "c4", name: "Priya Nair", location: "Kochi, India", cat: "art", bio: "Mixed-media artist reworking textile patterns into large-scale murals.", achievements: "Mural commission, Kochi Biennale", portfolio: "priyanair.art" },
+  { id: "c5", name: "Tendai Moyo", location: "Bulawayo, Zimbabwe", cat: "innovation", bio: "Product designer building low-cost tools for rural creators.", achievements: "Finalist, Pan-African Innovation Prize", portfolio: "tendaimoyo.dev" },
+  { id: "c6", name: "Lina Kovač", location: "Zagreb, Croatia", cat: "music", bio: "Composer scoring short films with analog synths and field recordings.", achievements: "Score credit — 4 short films", portfolio: "linakovac.bandcamp.com" },
+];
+
+const SEED_MENTORS = [
+  { id: "m1", name: "Farai Banda", role: "A&R, independent label", cat: "music", bio: "10 years helping emerging artists shape a sound and release their first EP." },
+  { id: "m2", name: "Grace Adebayo", role: "Editor, literary magazine", cat: "writing", bio: "Works with young poets and essayists on voice, structure, and submissions." },
+  { id: "m3", name: "Sam Okafor", role: "Documentary producer", cat: "film", bio: "Guides first-time filmmakers from concept to festival submission." },
+];
+
+const SEED_OPPORTUNITIES = [
+  { id: "o1", type: "Competition", title: "Pan-African Short Film Prize", cat: "film", deadline: "Aug 30, 2026", desc: "Open call for filmmakers under 30 telling local stories with global reach." },
+  { id: "o2", type: "Grant", title: "Emerging Voices Writing Grant", cat: "writing", deadline: "Sep 12, 2026", desc: "Funding and mentorship for poets and writers publishing a first collection." },
+  { id: "o3", type: "Job", title: "Junior Sound Designer, Remote", cat: "music", deadline: "Rolling", desc: "Small studio seeking a sound designer for indie game and film projects." },
+  { id: "o4", type: "Collaboration", title: "Mural Collective — Nairobi", cat: "art", deadline: "Aug 5, 2026", desc: "Looking for 3 visual artists to co-create a public mural series." },
+  { id: "o5", type: "Competition", title: "Youth Innovation Challenge", cat: "innovation", deadline: "Oct 1, 2026", desc: "Pitch a creative-tech idea that helps other creators; top ideas get seed funding." },
+];
+
+const SEED_COURSES = [
+  { id: "k1", cat: "music", level: "Beginner", title: "Songwriting Foundations", desc: "Structure, melody, and finding your lyrical voice." },
+  { id: "k2", cat: "writing", level: "Intermediate", title: "Editing Your Own Poetry", desc: "Cut, reshape, and strengthen a draft into a finished piece." },
+  { id: "k3", cat: "film", level: "Beginner", title: "Shooting on a Phone", desc: "Framing, light, and sound for no-budget filmmaking." },
+  { id: "k4", cat: "art", level: "Intermediate", title: "Color for Visual Storytellers", desc: "Building a palette that carries mood and meaning." },
+  { id: "k5", cat: "innovation", level: "Beginner", title: "From Idea to Prototype", desc: "Turning a creative concept into something people can try." },
+];
+
+const SEED_POSTS = [
+  { id: "p1", author: "Amara Osei", cat: "writing", text: "First draft of a new poem about my grandmother's kitchen. Feedback welcome.", ts: Date.now() - 1000 * 60 * 60 * 5 },
+  { id: "p2", author: "Diego Fuentes", cat: "film", text: "Wrapped filming in the highlands today. Editing starts next week — looking for a co-editor.", ts: Date.now() - 1000 * 60 * 60 * 20 },
+];
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+/* ---------------- storage helpers ---------------- */
+async function loadJSON(key, shared, fallback) {
+  try {
+    const r = await window.storage.get(key, shared);
+    return r ? JSON.parse(r.value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+async function saveJSON(key, value, shared) {
+  try {
+    await window.storage.set(key, JSON.stringify(value), shared);
+  } catch {
+    /* best effort */
+  }
+}
+
+/* ---------------- small UI atoms ---------------- */
+
+function Pill({ active, color, children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="pill"
+      style={{
+        borderColor: active ? color : "rgba(184,179,217,0.35)",
+        background: active ? color + "22" : "transparent",
+        color: active ? "#F5F3FF" : "#B8B3D9",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function CatTag({ id, small }) {
+  const c = catById(id);
+  const Icon = c.icon;
+  return (
+    <span className="cat-tag" style={{ color: c.color, borderColor: c.color + "55", fontSize: small ? 11 : 12 }}>
+      <Icon size={small ? 11 : 13} strokeWidth={2.2} />
+      {c.label}
+    </span>
+  );
+}
+
+function Toast({ message, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2400);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div className="toast">
+      <CheckCircle2 size={16} color="#4ECCA3" />
+      {message}
+    </div>
+  );
+}
+
+/* ---------------- Orbit hero signature element ---------------- */
+
+function Orbit({ onPick }) {
+  return (
+    <div className="orbit-wrap" aria-hidden="false">
+      <div className="orbit-ring r1" />
+      <div className="orbit-ring r2" />
+      <div className="core">
+        <Sparkles size={20} color="#14102B" />
+        <span>CHU</span>
+      </div>
+      {CATS.map((c, i) => {
+        const dur = 22 + i * 4;
+        const delay = -(i * 3.4);
+        const radius = i % 2 === 0 ? 128 : 168;
+        const Icon = c.icon;
+        return (
+          <div
+            key={c.id}
+            className="orbit-item"
+            style={{ animationDuration: `${dur}s`, animationDelay: `${delay}s`, ["--r"]: `${radius}px` }}
+          >
+            <button
+              className="orbit-node"
+              style={{ animationDuration: `${dur}s`, animationDelay: `${delay}s`, borderColor: c.color, boxShadow: `0 0 18px ${c.color}55` }}
+              onClick={() => onPick(c.id)}
+              title={c.label}
+            >
+              <Icon size={16} color={c.color} strokeWidth={2.2} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- Nav ---------------- */
+
+function NavBar({ view, setView, onJoin, mobileOpen, setMobileOpen }) {
+  const items = [
+    ["home", "Home", Globe2],
+    ["discover", "Discover", Search],
+    ["mentorship", "Mentorship", Users],
+    ["opportunities", "Opportunities", Briefcase],
+    ["community", "Community", MessageCircle],
+    ["academy", "Academy", GraduationCap],
+    ["dashboard", "Dashboard", LayoutDashboard],
+  ];
+  return (
+    <header className="nav">
+      <div className="nav-inner">
+        <button className="brand" onClick={() => setView("home")}>
+          <span className="brand-mark"><Sparkles size={16} color="#14102B" /></span>
+          <span className="brand-text">CHU</span>
+        </button>
+        <nav className="nav-links">
+          {items.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              className={"nav-link" + (view === id ? " active" : "")}
+              onClick={() => setView(id)}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="nav-right">
+          <button className="btn btn-gold btn-sm" onClick={onJoin}>Join CHU</button>
+          <button className="hamburger" onClick={() => setMobileOpen(!mobileOpen)}><Menu size={20} /></button>
+        </div>
+      </div>
+      {mobileOpen && (
+        <div className="nav-mobile">
+          {items.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              className={"nav-link" + (view === id ? " active" : "")}
+              onClick={() => { setView(id); setMobileOpen(false); }}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </header>
+  );
+}
+
+/* ---------------- Home ---------------- */
+
+function Home({ setView, setDiscoverFilter, onJoin, myProfile }) {
+  return (
+    <div>
+      <section className="hero">
+        <div className="hero-text">
+          <span className="eyebrow"><Rocket size={12} /> Founded by Felix Samahanda, from Zambia</span>
+          <h1>Creative Humanity Universe</h1>
+          <p className="tagline">Where creativity meets opportunity.</p>
+          <p className="message">"Every person has a talent, idea, or story that deserves to be seen."</p>
+          <div className="hero-actions">
+            <button className="btn btn-gold" onClick={onJoin}>
+              {myProfile ? "View my profile" : "Join CHU"} <ArrowRight size={15} />
+            </button>
+            <button className="btn btn-ghost" onClick={() => setView("discover")}>Explore Creators</button>
+          </div>
+        </div>
+        <Orbit onPick={(catId) => { setDiscoverFilter(catId); setView("discover"); }} />
+      </section>
+
+      <section className="grid-4 section">
+        <div className="info-card">
+          <h3><Globe2 size={16} /> Our Vision</h3>
+          <p>A world where young creators have opportunities to express themselves, connect with others, and turn their creativity into something meaningful.</p>
+        </div>
+        <div className="info-card">
+          <h3><Sparkles size={16} /> Our Mission</h3>
+          <p>To empower the next generation of creators by giving them a platform where creativity, technology, and human connection come together.</p>
+        </div>
+        <div className="info-card">
+          <h3><Heart size={16} /> Why CHU</h3>
+          <p>A song can inspire millions. A story can change a life. An idea can build a better future — every voice here has something worth contributing.</p>
+        </div>
+        <div className="info-card founder-card">
+          <h3><Star size={16} /> Founder's Message</h3>
+          <p>"I created CHU because I believe creativity has the power to unite people and create opportunities. I'm building this from Zambia, connecting creative minds worldwide."</p>
+          <span className="founder-sig">— Felix Samahanda</span>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-head">
+          <h2>Five worlds, one universe</h2>
+          <p className="muted">Pick a category to explore creators, or start your own orbit.</p>
+        </div>
+        <div className="cat-grid">
+          {CATS.map((c) => {
+            const Icon = c.icon;
+            return (
+              <button key={c.id} className="cat-card" style={{ borderColor: c.color + "40" }}
+                onClick={() => { setDiscoverFilter(c.id); setView("discover"); }}>
+                <span className="cat-card-icon" style={{ background: c.color + "1a", color: c.color }}>
+                  <Icon size={20} />
+                </span>
+                <span>{c.label}</span>
+                <ChevronRight size={15} className="muted" />
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ---------------- Discover ---------------- */
+
+function Discover({ creators, filter, setFilter, onConnect, connected }) {
+  const [q, setQ] = useState("");
+  const filtered = creators.filter((c) => {
+    const matchesCat = !filter || c.cat === filter;
+    const matchesQ = !q || (c.name + c.location + c.bio).toLowerCase().includes(q.toLowerCase());
+    return matchesCat && matchesQ;
+  });
+  const featured = creators.slice(0, 3);
+
+  return (
+    <div className="section">
+      <div className="section-head">
+        <h2>Discover Creators</h2>
+        <p className="muted">Search the universe. Connect with people building something.</p>
+      </div>
+
+      <div className="search-row">
+        <div className="search-box">
+          <Search size={16} className="muted" />
+          <input placeholder="Search by name, place, or focus…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+      </div>
+      <div className="pill-row">
+        <Pill active={!filter} color="#F2B705" onClick={() => setFilter(null)}>All</Pill>
+        {CATS.map((c) => (
+          <Pill key={c.id} active={filter === c.id} color={c.color} onClick={() => setFilter(filter === c.id ? null : c.id)}>
+            {c.label}
+          </Pill>
+        ))}
+      </div>
+
+      {!filter && !q && (
+        <div className="featured-row">
+          <span className="mini-label">Featured</span>
+          <div className="featured-cards">
+            {featured.map((c) => (
+              <div key={c.id} className="featured-card" style={{ borderColor: catById(c.cat).color + "40" }}>
+                <div className="avatar" style={{ background: catById(c.cat).color + "22", color: catById(c.cat).color }}>{c.name[0]}</div>
+                <div>
+                  <div className="creator-name">{c.name}</div>
+                  <CatTag id={c.cat} small />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="creator-grid">
+        {filtered.map((c) => (
+          <div key={c.id} className="creator-card">
+            <div className="creator-card-top">
+              <div className="avatar" style={{ background: catById(c.cat).color + "22", color: catById(c.cat).color }}>{c.name[0]}</div>
+              <div>
+                <div className="creator-name">{c.name}</div>
+                <div className="creator-loc muted"><MapPin size={11} /> {c.location}</div>
+              </div>
+            </div>
+            <CatTag id={c.cat} />
+            <p className="creator-bio">{c.bio}</p>
+            {c.achievements && <div className="mini-row"><Award size={12} /> {c.achievements}</div>}
+            {c.portfolio && <div className="mini-row"><ExternalLink size={12} /> {c.portfolio}</div>}
+            <button
+              className={"btn btn-sm " + (connected.has(c.id) ? "btn-connected" : "btn-outline")}
+              onClick={() => onConnect(c.id)}
+              disabled={connected.has(c.id)}
+            >
+              {connected.has(c.id) ? <><CheckCircle2 size={13} /> Connected</> : "Connect"}
+            </button>
+          </div>
+        ))}
+        {filtered.length === 0 && <p className="muted">No creators match yet — try a different search or category.</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Mentorship ---------------- */
+
+function Mentorship({ mentors, addMentor, requested, onRequest }) {
+  const [tab, setTab] = useState("find");
+  const [form, setForm] = useState({ name: "", role: "", cat: "music", bio: "" });
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.bio.trim()) return;
+    addMentor({ id: uid(), ...form });
+    setForm({ name: "", role: "", cat: "music", bio: "" });
+    setTab("find");
+  };
+
+  return (
+    <div className="section">
+      <div className="section-head">
+        <h2>Mentorship Hub</h2>
+        <p className="muted">Guidance, one conversation at a time.</p>
+      </div>
+      <div className="tab-row">
+        <button className={"tab" + (tab === "find" ? " active" : "")} onClick={() => setTab("find")}>Find a mentor</button>
+        <button className={"tab" + (tab === "become" ? " active" : "")} onClick={() => setTab("become")}>Become a mentor</button>
+      </div>
+
+      {tab === "find" ? (
+        <div className="creator-grid">
+          {mentors.map((m) => (
+            <div key={m.id} className="creator-card">
+              <div className="creator-card-top">
+                <div className="avatar" style={{ background: catById(m.cat).color + "22", color: catById(m.cat).color }}>{m.name[0]}</div>
+                <div>
+                  <div className="creator-name">{m.name}</div>
+                  <div className="creator-loc muted">{m.role}</div>
+                </div>
+              </div>
+              <CatTag id={m.cat} />
+              <p className="creator-bio">{m.bio}</p>
+              <button
+                className={"btn btn-sm " + (requested.has(m.id) ? "btn-connected" : "btn-outline")}
+                onClick={() => onRequest(m.id)}
+                disabled={requested.has(m.id)}
+              >
+                {requested.has(m.id) ? <><CheckCircle2 size={13} /> Requested</> : "Request guidance"}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <form className="form-card" onSubmit={submit}>
+          <label>Name
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" required />
+          </label>
+          <label>Role / background
+            <input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="e.g. Producer, 8 years in indie music" />
+          </label>
+          <label>Talent category you mentor in
+            <select value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })}>
+              {CATS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </label>
+          <label>How you can help
+            <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="What kind of guidance can you offer?" required />
+          </label>
+          <button className="btn btn-gold" type="submit"><Plus size={15} /> Create mentor profile</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Opportunities ---------------- */
+
+function Opportunities({ opportunities, saved, onSave, onApply, applied }) {
+  const [filter, setFilter] = useState(null);
+  const filtered = filter ? opportunities.filter((o) => o.cat === filter) : opportunities;
+  const typeColor = { Competition: "#F2B705", Grant: "#4ECCA3", Job: "#4EA8DE", Collaboration: "#9B6BFF" };
+
+  return (
+    <div className="section">
+      <div className="section-head">
+        <h2>Opportunities Board</h2>
+        <p className="muted">Competitions, grants, jobs, and collaborations — open right now.</p>
+      </div>
+      <div className="pill-row">
+        <Pill active={!filter} color="#F2B705" onClick={() => setFilter(null)}>All</Pill>
+        {CATS.map((c) => (
+          <Pill key={c.id} active={filter === c.id} color={c.color} onClick={() => setFilter(filter === c.id ? null : c.id)}>{c.label}</Pill>
+        ))}
+      </div>
+      <div className="opp-list">
+        {filtered.map((o) => (
+          <div key={o.id} className="opp-card">
+            <div className="opp-top">
+              <span className="opp-type" style={{ color: typeColor[o.type], borderColor: typeColor[o.type] + "55" }}>{o.type}</span>
+              <CatTag id={o.cat} small />
+            </div>
+            <h4>{o.title}</h4>
+            <p className="creator-bio">{o.desc}</p>
+            <div className="opp-bottom">
+              <span className="mini-row"><Bell size={12} /> Deadline: {o.deadline}</span>
+              <div className="opp-actions">
+                <button className="icon-btn" title="Save" onClick={() => onSave(o.id)}>
+                  <Bookmark size={15} fill={saved.has(o.id) ? "#F2B705" : "none"} color={saved.has(o.id) ? "#F2B705" : "#B8B3D9"} />
+                </button>
+                <button
+                  className={"btn btn-sm " + (applied.has(o.id) ? "btn-connected" : "btn-outline")}
+                  onClick={() => onApply(o.id)}
+                  disabled={applied.has(o.id)}
+                >
+                  {applied.has(o.id) ? <><CheckCircle2 size={13} /> Applied</> : "Apply"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Community ---------------- */
+
+function Community({ posts, addPost, myProfile }) {
+  const [text, setText] = useState("");
+  const [cat, setCat] = useState("music");
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    addPost({ id: uid(), author: myProfile?.name || "You", cat, text: text.trim(), ts: Date.now() });
+    setText("");
+  };
+
+  const timeAgo = (ts) => {
+    const mins = Math.round((Date.now() - ts) / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.round(hrs / 24)}d ago`;
+  };
+
+  return (
+    <div className="section">
+      <div className="section-head">
+        <h2>Community</h2>
+        <p className="muted">Share work in progress. Find your next collaborator.</p>
+      </div>
+
+      <form className="post-form" onSubmit={submit}>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Share a post, ask for feedback, or find a collaborator…" />
+        <div className="post-form-row">
+          <select value={cat} onChange={(e) => setCat(e.target.value)}>
+            {CATS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+          <button className="btn btn-gold btn-sm" type="submit"><Send size={13} /> Post</button>
+        </div>
+      </form>
+
+      <div className="post-list">
+        {posts.slice().sort((a, b) => b.ts - a.ts).map((p) => (
+          <div key={p.id} className="post-card">
+            <div className="creator-card-top">
+              <div className="avatar" style={{ background: catById(p.cat).color + "22", color: catById(p.cat).color }}>{p.author[0]}</div>
+              <div>
+                <div className="creator-name">{p.author}</div>
+                <div className="creator-loc muted">{timeAgo(p.ts)}</div>
+              </div>
+            </div>
+            <CatTag id={p.cat} small />
+            <p className="creator-bio">{p.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Academy ---------------- */
+
+function Academy({ courses }) {
+  const [filter, setFilter] = useState(null);
+  const filtered = filter ? courses.filter((k) => k.cat === filter) : courses;
+  return (
+    <div className="section">
+      <div className="section-head">
+        <h2>CHU Academy</h2>
+        <p className="muted">Courses, workshops, and tutorials to sharpen your craft.</p>
+      </div>
+      <div className="pill-row">
+        <Pill active={!filter} color="#F2B705" onClick={() => setFilter(null)}>All</Pill>
+        {CATS.map((c) => (
+          <Pill key={c.id} active={filter === c.id} color={c.color} onClick={() => setFilter(filter === c.id ? null : c.id)}>{c.label}</Pill>
+        ))}
+      </div>
+      <div className="course-grid">
+        {filtered.map((k) => (
+          <div key={k.id} className="course-card" style={{ borderColor: catById(k.cat).color + "40" }}>
+            <div className="opp-top">
+              <CatTag id={k.cat} small />
+              <span className="level-badge">{k.level}</span>
+            </div>
+            <h4>{k.title}</h4>
+            <p className="creator-bio">{k.desc}</p>
+            <button className="btn btn-outline btn-sm"><BookOpen size={13} /> Start course</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Dashboard ---------------- */
+
+function Dashboard({ myProfile, onEditProfile, savedOpportunities, opportunities, connected, requested, setView }) {
+  const savedList = opportunities.filter((o) => savedOpportunities.has(o.id));
+  return (
+    <div className="section">
+      <div className="section-head">
+        <h2>My Dashboard</h2>
+        <p className="muted">Everything you're building on CHU, in one place.</p>
+      </div>
+
+      {!myProfile ? (
+        <div className="empty-state">
+          <p>You haven't set up a creator profile yet.</p>
+          <button className="btn btn-gold" onClick={onEditProfile}><Plus size={15} /> Create your profile</button>
+        </div>
+      ) : (
+        <div className="dash-grid">
+          <div className="dash-card profile-card">
+            <div className="creator-card-top">
+              <div className="avatar avatar-lg" style={{ background: catById(myProfile.cat).color + "22", color: catById(myProfile.cat).color }}>{myProfile.name[0]}</div>
+              <div>
+                <div className="creator-name">{myProfile.name}</div>
+                <div className="creator-loc muted"><MapPin size={11} /> {myProfile.location}</div>
+              </div>
+            </div>
+            <CatTag id={myProfile.cat} />
+            <p className="creator-bio">{myProfile.bio}</p>
+            <button className="btn btn-outline btn-sm" onClick={onEditProfile}>Edit profile</button>
+          </div>
+
+          <div className="dash-card">
+            <h3><Bookmark size={15} /> Saved opportunities ({savedList.length})</h3>
+            {savedList.length === 0 ? <p className="muted">Nothing saved yet — browse the Opportunities Board.</p> :
+              savedList.map((o) => <div key={o.id} className="mini-row"><ChevronRight size={12} /> {o.title}</div>)}
+            <button className="btn btn-ghost btn-sm" onClick={() => setView("opportunities")}>View board</button>
+          </div>
+
+          <div className="dash-card">
+            <h3><Users size={15} /> Connections ({connected.size})</h3>
+            <p className="muted">Creators you've connected with on Discover.</p>
+            <button className="btn btn-ghost btn-sm" onClick={() => setView("discover")}>Discover more</button>
+          </div>
+
+          <div className="dash-card">
+            <h3><Bell size={15} /> Notifications</h3>
+            <div className="mini-row"><CheckCircle2 size={12} color="#4ECCA3" /> Profile created</div>
+            {requested.size > 0 && <div className="mini-row"><CheckCircle2 size={12} color="#4ECCA3" /> {requested.size} mentorship request(s) sent</div>}
+            <div className="mini-row"><Mail size={12} /> Messages — coming soon</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Profile modal ---------------- */
+
+function ProfileModal({ initial, onClose, onSave }) {
+  const [form, setForm] = useState(initial || { name: "", location: "", cat: "music", bio: "", portfolio: "", achievements: "" });
+  const submit = (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.bio.trim()) return;
+    onSave({ id: initial?.id || uid(), ...form });
+  };
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>{initial ? "Edit your profile" : "Join CHU"}</h3>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form className="form-card" onSubmit={submit}>
+          <label>Name
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" required />
+          </label>
+          <label>Location
+            <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="City, Country" />
+          </label>
+          <label>Talent category
+            <select value={form.cat} onChange={(e) => setForm({ ...form, cat: e.target.value })}>
+              {CATS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </label>
+          <label>Biography
+            <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Tell the universe who you are" required />
+          </label>
+          <label>Portfolio link
+            <input value={form.portfolio} onChange={(e) => setForm({ ...form, portfolio: e.target.value })} placeholder="yourwork.com" />
+          </label>
+          <label>Achievements
+            <input value={form.achievements} onChange={(e) => setForm({ ...form, achievements: e.target.value })} placeholder="Awards, features, milestones" />
+          </label>
+          <button className="btn btn-gold" type="submit"><Sparkles size={15} /> {initial ? "Save changes" : "Create my profile"}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- App ---------------- */
+
+export default function App() {
+  const [view, setView] = useState("home");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [discoverFilter, setDiscoverFilter] = useState(null);
+
+  const [creators, setCreators] = useState(SEED_CREATORS);
+  const [mentors, setMentors] = useState(SEED_MENTORS);
+  const [opportunities] = useState(SEED_OPPORTUNITIES);
+  const [courses] = useState(SEED_COURSES);
+  const [posts, setPosts] = useState(SEED_POSTS);
+
+  const [myProfile, setMyProfile] = useState(null);
+  const [connected, setConnected] = useState(new Set());
+  const [requested, setRequested] = useState(new Set());
+  const [saved, setSaved] = useState(new Set());
+  const [applied, setApplied] = useState(new Set());
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  // load persisted state
+  useEffect(() => {
+    (async () => {
+      const profile = await loadJSON("chu:profile", false, null);
+      const sharedPosts = await loadJSON("chu:posts", true, null);
+      const savedArr = await loadJSON("chu:saved", false, []);
+      const connectedArr = await loadJSON("chu:connected", false, []);
+      const requestedArr = await loadJSON("chu:requested", false, []);
+      const appliedArr = await loadJSON("chu:applied", false, []);
+      if (profile) setMyProfile(profile);
+      if (sharedPosts && sharedPosts.length) setPosts(sharedPosts);
+      setSaved(new Set(savedArr));
+      setConnected(new Set(connectedArr));
+      setRequested(new Set(requestedArr));
+      setApplied(new Set(appliedArr));
+      setLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => { if (loaded) saveJSON("chu:saved", [...saved], false); }, [saved, loaded]);
+  useEffect(() => { if (loaded) saveJSON("chu:connected", [...connected], false); }, [connected, loaded]);
+  useEffect(() => { if (loaded) saveJSON("chu:requested", [...requested], false); }, [requested, loaded]);
+  useEffect(() => { if (loaded) saveJSON("chu:applied", [...applied], false); }, [applied, loaded]);
+  useEffect(() => { if (loaded) saveJSON("chu:posts", posts, true); }, [posts, loaded]);
+
+  const showToast = (msg) => setToast(msg);
+
+  const handleSaveProfile = (profile) => {
+    setMyProfile(profile);
+    saveJSON("chu:profile", profile, false);
+    setCreators((prev) => {
+      const exists = prev.some((c) => c.id === profile.id);
+      return exists ? prev.map((c) => (c.id === profile.id ? profile : c)) : [profile, ...prev];
+    });
+    setShowProfileModal(false);
+    showToast("Profile saved");
+    setView("dashboard");
+  };
+
+  const handleConnect = (id) => {
+    setConnected((prev) => new Set(prev).add(id));
+    showToast("Connected");
+  };
+  const handleRequestMentor = (id) => {
+    setRequested((prev) => new Set(prev).add(id));
+    showToast("Mentorship request sent");
+  };
+  const handleSaveOpp = (id) => {
+    setSaved((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const handleApplyOpp = (id) => {
+    setApplied((prev) => new Set(prev).add(id));
+    showToast("Application started");
+  };
+  const handleAddMentor = (m) => {
+    setMentors((prev) => [m, ...prev]);
+    showToast("Mentor profile created");
+  };
+  const handleAddPost = (p) => {
+    setPosts((prev) => [p, ...prev]);
+  };
+
+  return (
+    <div className="chu">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+        .chu { --ink:#14102B; --surface:#1E1840; --surface2:#241C4A; --gold:#F2B705; --ember:#E8543E; --mist:#B8B3D9; --paper:#F5F3FF;
+          background: radial-gradient(ellipse at top, #221a4a 0%, var(--ink) 55%); color: var(--paper);
+          font-family: 'Sora', sans-serif; min-height: 100vh; }
+        .chu * { box-sizing: border-box; }
+        .chu ::selection { background: var(--gold); color: var(--ink); }
+        h1,h2,h3,h4 { font-family: 'Fraunces', serif; margin: 0; }
+        .muted { color: var(--mist); }
+        p { line-height: 1.55; color: var(--mist); margin: 0; }
+
+        /* Nav */
+        .nav { position: sticky; top:0; z-index: 40; background: rgba(20,16,43,0.85); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(184,179,217,0.12); }
+        .nav-inner { max-width: 1180px; margin: 0 auto; display:flex; align-items:center; gap:24px; padding: 12px 20px; }
+        .brand { display:flex; align-items:center; gap:8px; background:none; border:none; cursor:pointer; }
+        .brand-mark { width:28px;height:28px;border-radius:8px; background: var(--gold); display:flex; align-items:center; justify-content:center; }
+        .brand-text { font-family:'Fraunces',serif; font-weight:700; font-size:18px; letter-spacing:0.5px; color: var(--paper); }
+        .nav-links { display:flex; gap:4px; flex:1; }
+        .nav-link { display:flex; align-items:center; gap:6px; background:none; border:none; color: var(--mist); font-size:13.5px; font-family:'Sora',sans-serif; padding:8px 10px; border-radius:8px; cursor:pointer; white-space:nowrap; }
+        .nav-link:hover { color: var(--paper); background: rgba(184,179,217,0.08); }
+        .nav-link.active { color: var(--ink); background: var(--gold); font-weight:600; }
+        .nav-right { display:flex; align-items:center; gap:10px; }
+        .hamburger { display:none; background:none; border:none; color: var(--paper); cursor:pointer; }
+        .nav-mobile { display:none; }
+
+        @media (max-width: 900px) {
+          .nav-links { display:none; }
+          .hamburger { display:block; }
+          .nav-mobile { display:flex; flex-direction:column; padding: 8px 20px 14px; gap:2px; border-top:1px solid rgba(184,179,217,0.12); }
+        }
+
+        .btn { font-family:'Sora',sans-serif; font-weight:600; font-size:14px; border-radius:10px; padding:11px 18px; border:1px solid transparent; cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition: transform .15s ease, opacity .15s ease; }
+        .btn:active { transform: scale(0.97); }
+        .btn:disabled { cursor:default; opacity:0.85; }
+        .btn-gold { background: var(--gold); color: var(--ink); }
+        .btn-gold:hover { opacity:0.92; }
+        .btn-ghost { background: transparent; color: var(--paper); border-color: rgba(184,179,217,0.35); }
+        .btn-ghost:hover { background: rgba(184,179,217,0.08); }
+        .btn-outline { background: transparent; color: var(--paper); border-color: rgba(184,179,217,0.35); }
+        .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+        .btn-connected { background: rgba(78,204,163,0.15); color:#4ECCA3; border-color: rgba(78,204,163,0.4); }
+        .btn-sm { padding: 7px 12px; font-size:12.5px; }
+        .icon-btn { background:none; border:none; color: var(--mist); cursor:pointer; padding:4px; display:flex; }
+
+        /* Hero */
+        .hero { max-width:1180px; margin:0 auto; padding: 56px 20px 20px; display:flex; align-items:center; gap:40px; flex-wrap:wrap; }
+        .hero-text { flex: 1 1 420px; min-width:300px; }
+        .eyebrow { display:inline-flex; align-items:center; gap:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:0.06em; color: var(--gold); border:1px solid rgba(242,183,5,0.35); padding:5px 10px; border-radius:20px; margin-bottom:18px; }
+        .hero-text h1 { font-size: clamp(32px, 5vw, 52px); line-height:1.08; color: var(--paper); font-weight:700; }
+        .tagline { font-family:'Fraunces',serif; font-style:italic; font-size:19px; color: var(--gold); margin-top:14px; }
+        .message { font-size:15.5px; margin-top:14px; max-width: 440px; }
+        .hero-actions { display:flex; gap:12px; margin-top:28px; flex-wrap:wrap; }
+
+        /* Orbit */
+        .orbit-wrap { position:relative; width:360px; height:360px; flex-shrink:0; margin: 0 auto; }
+        .orbit-ring { position:absolute; border:1px dashed rgba(184,179,217,0.18); border-radius:50%; }
+        .orbit-ring.r1 { inset: 76px; }
+        .orbit-ring.r2 { inset: 36px; }
+        .core { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:64px; height:64px; border-radius:50%; background: var(--gold); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; box-shadow: 0 0 40px rgba(242,183,5,0.45); z-index:2; }
+        .core span { font-family:'Fraunces',serif; font-weight:700; color: var(--ink); font-size:12px; }
+        .orbit-item { position:absolute; top:50%; left:50%; width:0; height:0; animation-name: spin; animation-timing-function:linear; animation-iteration-count:infinite; }
+        .orbit-node { position:absolute; transform: translate(-50%,-50%) translate(var(--r), 0); width:38px; height:38px; border-radius:50%; background: var(--surface2); border:1.5px solid; display:flex; align-items:center; justify-content:center; cursor:pointer; animation-name: counter-spin; animation-timing-function:linear; animation-iteration-count:infinite; }
+        @keyframes spin { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+        @keyframes counter-spin { from { transform: translate(-50%,-50%) translate(var(--r),0) rotate(0deg); } to { transform: translate(-50%,-50%) translate(var(--r),0) rotate(-360deg); } }
+        @media (max-width: 900px) { .orbit-wrap { width:280px; height:280px; } .orbit-ring.r1{inset:60px;} .orbit-ring.r2{inset:28px;} }
+        @media (prefers-reduced-motion: reduce) { .orbit-item, .orbit-node { animation: none !important; } }
+
+        /* sections */
+        .section { max-width:1180px; margin:0 auto; padding: 44px 20px; }
+        .section-head { margin-bottom:26px; }
+        .section-head h2 { font-size:28px; color: var(--paper); margin-bottom:6px; }
+        .grid-4 { display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; }
+        @media (max-width: 1000px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { .grid-4 { grid-template-columns: 1fr; } }
+        .info-card { background: var(--surface); border:1px solid rgba(184,179,217,0.12); border-radius:16px; padding:20px; }
+        .info-card h3 { display:flex; align-items:center; gap:8px; font-size:15px; color: var(--gold); margin-bottom:10px; }
+        .founder-card { background: linear-gradient(160deg, var(--surface2), var(--surface)); border-color: rgba(242,183,5,0.25); }
+        .founder-sig { display:block; margin-top:10px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color: var(--mist); }
+
+        .cat-grid { display:grid; grid-template-columns: repeat(5,1fr); gap:12px; }
+        @media (max-width: 1000px) { .cat-grid { grid-template-columns: repeat(2,1fr); } }
+        .cat-card { display:flex; align-items:center; gap:10px; background: var(--surface); border:1px solid; border-radius:12px; padding:14px; color: var(--paper); cursor:pointer; font-size:13.5px; font-weight:600; text-align:left; }
+        .cat-card:hover { transform: translateY(-2px); }
+        .cat-card-icon { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .cat-card span:nth-child(2) { flex:1; }
+
+        .pill-row { display:flex; gap:8px; flex-wrap:wrap; margin: 14px 0 22px; }
+        .pill { font-family:'Sora',sans-serif; font-size:12.5px; font-weight:600; border:1px solid; border-radius:20px; padding:7px 13px; cursor:pointer; }
+
+        .search-row { margin-bottom: 6px; }
+        .search-box { display:flex; align-items:center; gap:10px; background: var(--surface); border:1px solid rgba(184,179,217,0.18); border-radius:12px; padding:11px 14px; max-width:420px; }
+        .search-box input { background:none; border:none; outline:none; color: var(--paper); font-family:'Sora',sans-serif; font-size:14px; width:100%; }
+
+        .mini-label { font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.08em; color: var(--mist); text-transform:uppercase; }
+        .featured-row { margin-bottom: 20px; }
+        .featured-cards { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+        .featured-card { display:flex; align-items:center; gap:10px; background: var(--surface); border:1px solid; border-radius:12px; padding:10px 14px; }
+
+        .creator-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:16px; }
+        @media (max-width: 1000px) { .creator-grid { grid-template-columns: repeat(2,1fr); } }
+        @media (max-width: 640px) { .creator-grid { grid-template-columns: 1fr; } }
+        .creator-card, .post-card { background: var(--surface); border:1px solid rgba(184,179,217,0.12); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:10px; }
+        .creator-card-top { display:flex; align-items:center; gap:10px; }
+        .avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Fraunces',serif; font-weight:700; flex-shrink:0; }
+        .avatar-lg { width:56px; height:56px; font-size:20px; }
+        .creator-name { font-weight:600; color: var(--paper); font-size:14.5px; }
+        .creator-loc { display:flex; align-items:center; gap:4px; font-size:12px; }
+        .cat-tag { display:inline-flex; align-items:center; gap:5px; border:1px solid; border-radius:20px; padding:3px 9px; width:fit-content; font-weight:600; }
+        .creator-bio { font-size:13.5px; }
+        .mini-row { display:flex; align-items:center; gap:6px; font-size:12px; color: var(--mist); }
+
+        .tab-row { display:flex; gap:6px; margin-bottom:22px; background: var(--surface); border-radius:12px; padding:4px; width:fit-content; }
+        .tab { background:none; border:none; color: var(--mist); font-family:'Sora',sans-serif; font-weight:600; font-size:13px; padding:9px 16px; border-radius:9px; cursor:pointer; }
+        .tab.active { background: var(--gold); color: var(--ink); }
+
+        .form-card { display:flex; flex-direction:column; gap:14px; background: var(--surface); border:1px solid rgba(184,179,217,0.12); border-radius:16px; padding:22px; max-width:480px; }
+        .form-card label { display:flex; flex-direction:column; gap:6px; font-size:12.5px; color: var(--mist); font-weight:600; }
+        .form-card input, .form-card select, .form-card textarea { font-family:'Sora',sans-serif; background: var(--surface2); border:1px solid rgba(184,179,217,0.2); border-radius:9px; padding:10px 12px; color: var(--paper); font-size:14px; outline:none; }
+        .form-card textarea { min-height:80px; resize:vertical; }
+        .form-card input:focus, .form-card select:focus, .form-card textarea:focus { border-color: var(--gold); }
+
+        .opp-list { display:flex; flex-direction:column; gap:12px; }
+        .opp-card { background: var(--surface); border:1px solid rgba(184,179,217,0.12); border-radius:16px; padding:18px 20px; }
+        .opp-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+        .opp-type { font-family:'IBM Plex Mono',monospace; font-size:11px; border:1px solid; border-radius:6px; padding:3px 8px; }
+        .opp-card h4 { font-size:16.5px; color: var(--paper); margin: 4px 0 6px; }
+        .opp-bottom { display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:10px; }
+        .opp-actions { display:flex; align-items:center; gap:8px; }
+        .level-badge { font-family:'IBM Plex Mono',monospace; font-size:10.5px; color: var(--mist); border:1px solid rgba(184,179,217,0.3); border-radius:6px; padding:3px 8px; }
+
+        .course-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:16px; }
+        @media (max-width: 1000px) { .course-grid { grid-template-columns: repeat(2,1fr); } }
+        @media (max-width: 640px) { .course-grid { grid-template-columns: 1fr; } }
+        .course-card { background: var(--surface); border:1px solid; border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:8px; }
+        .course-card h4 { font-size:16px; color: var(--paper); }
+
+        .post-form { background: var(--surface); border:1px solid rgba(184,179,217,0.12); border-radius:16px; padding:16px; margin-bottom:22px; }
+        .post-form textarea { width:100%; background: var(--surface2); border:1px solid rgba(184,179,217,0.2); border-radius:9px; padding:10px 12px; color: var(--paper); font-family:'Sora',sans-serif; font-size:14px; min-height:60px; resize:vertical; outline:none; }
+        .post-form textarea:focus { border-color: var(--gold); }
+        .post-form-row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:10px; }
+        .post-form-row select { background: var(--surface2); border:1px solid rgba(184,179,217,0.2); border-radius:9px; padding:8px 10px; color: var(--paper); font-size:13px; }
+        .post-list { display:flex; flex-direction:column; gap:12px; }
+
+        .empty-state { background: var(--surface); border:1px dashed rgba(184,179,217,0.3); border-radius:16px; padding:40px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px; }
+        .dash-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:16px; }
+        @media (max-width: 800px) { .dash-grid { grid-template-columns: 1fr; } }
+        .dash-card { background: var(--surface); border:1px solid rgba(184,179,217,0.12); border-radius:16px; padding:20px; display:flex; flex-direction:column; gap:10px; }
+        .dash-card h3 { display:flex; align-items:center; gap:8px; font-size:15px; color: var(--paper); }
+        .profile-card { background: linear-gradient(160deg, var(--surface2), var(--surface)); border-color: rgba(242,183,5,0.2); }
+
+        .modal-backdrop { position:fixed; inset:0; background: rgba(10,8,26,0.7); backdrop-filter: blur(3px); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px; }
+        .modal { background: var(--ink); border:1px solid rgba(184,179,217,0.2); border-radius:18px; max-width:520px; width:100%; max-height:88vh; overflow:auto; padding:22px; }
+        .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+        .modal-head h3 { color: var(--paper); font-size:19px; }
+        .modal .form-card { max-width:none; border:none; padding:0; background:none; }
+
+        .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background: var(--surface2); border:1px solid rgba(78,204,163,0.4); color: var(--paper); padding:11px 18px; border-radius:12px; display:flex; align-items:center; gap:8px; font-size:13.5px; z-index:200; box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
+
+        footer.chu-footer { max-width:1180px; margin:0 auto; padding: 30px 20px 50px; display:flex; justify-content:space-between; align-items:center; color: var(--mist); font-size:12.5px; border-top:1px solid rgba(184,179,217,0.1); margin-top:20px; flex-wrap:wrap; gap:10px; }
+      `}</style>
+
+      <NavBar view={view} setView={setView} onJoin={() => setShowProfileModal(true)} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+
+      {view === "home" && <Home setView={setView} setDiscoverFilter={setDiscoverFilter} onJoin={() => (myProfile ? setView("dashboard") : setShowProfileModal(true))} myProfile={myProfile} />}
+      {view === "discover" && <Discover creators={creators} filter={discoverFilter} setFilter={setDiscoverFilter} onConnect={handleConnect} connected={connected} />}
+      {view === "mentorship" && <Mentorship mentors={mentors} addMentor={handleAddMentor} requested={requested} onRequest={handleRequestMentor} />}
+      {view === "opportunities" && <Opportunities opportunities={opportunities} saved={saved} onSave={handleSaveOpp} onApply={handleApplyOpp} applied={applied} />}
+      {view === "community" && <Community posts={posts} addPost={handleAddPost} myProfile={myProfile} />}
+      {view === "academy" && <Academy courses={courses} />}
+      {view === "dashboard" && (
+        <Dashboard
+          myProfile={myProfile}
+          onEditProfile={() => setShowProfileModal(true)}
+          savedOpportunities={saved}
+          opportunities={opportunities}
+          connected={connected}
+          requested={requested}
+          setView={setView}
+        />
+      )}
+
+      <footer className="chu-footer">
+        <span>Creative Humanity Universe · Where creativity meets opportunity.</span>
+        <span>Founded by Felix Samahanda, Zambia</span>
+      </footer>
+
+      {showProfileModal && (
+        <ProfileModal initial={myProfile} onClose={() => setShowProfileModal(false)} onSave={handleSaveProfile} />
+      )}
+      {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+    </div>
+  );
+}
